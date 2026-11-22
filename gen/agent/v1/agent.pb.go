@@ -1214,12 +1214,15 @@ func (x *Heartbeat) GetUsage() *ResourceUsage {
 }
 
 type ResourceUsage struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	RamUsedMb      int64                  `protobuf:"varint,1,opt,name=ram_used_mb,json=ramUsedMb,proto3" json:"ram_used_mb,omitempty"`                 // by devices
-	CpuUsedPercent float64                `protobuf:"fixed64,2,opt,name=cpu_used_percent,json=cpuUsedPercent,proto3" json:"cpu_used_percent,omitempty"` // of host
-	StorageUsedGb  int64                  `protobuf:"varint,3,opt,name=storage_used_gb,json=storageUsedGb,proto3" json:"storage_used_gb,omitempty"`     // actual disk usage of devices
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	RamUsedMb          int64                  `protobuf:"varint,1,opt,name=ram_used_mb,json=ramUsedMb,proto3" json:"ram_used_mb,omitempty"`                           // measured memory of running devices (sum of DeviceStatus.memory_used_mb)
+	CpuUsedPercent     float64                `protobuf:"fixed64,2,opt,name=cpu_used_percent,json=cpuUsedPercent,proto3" json:"cpu_used_percent,omitempty"`           // whole host, 0-100
+	StorageUsedGb      int64                  `protobuf:"varint,3,opt,name=storage_used_gb,json=storageUsedGb,proto3" json:"storage_used_gb,omitempty"`               // actual disk usage of devices
+	HostRamUsedMb      int64                  `protobuf:"varint,4,opt,name=host_ram_used_mb,json=hostRamUsedMb,proto3" json:"host_ram_used_mb,omitempty"`             // whole host: MemTotal - MemAvailable
+	HostStorageUsedGb  int64                  `protobuf:"varint,5,opt,name=host_storage_used_gb,json=hostStorageUsedGb,proto3" json:"host_storage_used_gb,omitempty"` // filesystem holding the agent's data_dir
+	HostStorageTotalGb int64                  `protobuf:"varint,6,opt,name=host_storage_total_gb,json=hostStorageTotalGb,proto3" json:"host_storage_total_gb,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *ResourceUsage) Reset() {
@@ -1273,6 +1276,27 @@ func (x *ResourceUsage) GetStorageUsedGb() int64 {
 	return 0
 }
 
+func (x *ResourceUsage) GetHostRamUsedMb() int64 {
+	if x != nil {
+		return x.HostRamUsedMb
+	}
+	return 0
+}
+
+func (x *ResourceUsage) GetHostStorageUsedGb() int64 {
+	if x != nil {
+		return x.HostStorageUsedGb
+	}
+	return 0
+}
+
+func (x *ResourceUsage) GetHostStorageTotalGb() int64 {
+	if x != nil {
+		return x.HostStorageTotalGb
+	}
+	return 0
+}
+
 type DeviceStatus struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DeviceId      string                 `protobuf:"bytes,1,opt,name=device_id,json=deviceId,proto3" json:"device_id,omitempty"`
@@ -1282,6 +1306,7 @@ type DeviceStatus struct {
 	InternalIp    string                 `protobuf:"bytes,5,opt,name=internal_ip,json=internalIp,proto3" json:"internal_ip,omitempty"`
 	StorageUsedMb int64                  `protobuf:"varint,6,opt,name=storage_used_mb,json=storageUsedMb,proto3" json:"storage_used_mb,omitempty"`
 	UpdatedUnix   int64                  `protobuf:"varint,7,opt,name=updated_unix,json=updatedUnix,proto3" json:"updated_unix,omitempty"`
+	MemoryUsedMb  int64                  `protobuf:"varint,8,opt,name=memory_used_mb,json=memoryUsedMb,proto3" json:"memory_used_mb,omitempty"` // measured guest/container memory, 0 = unknown
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1361,6 +1386,13 @@ func (x *DeviceStatus) GetStorageUsedMb() int64 {
 func (x *DeviceStatus) GetUpdatedUnix() int64 {
 	if x != nil {
 		return x.UpdatedUnix
+	}
+	return 0
+}
+
+func (x *DeviceStatus) GetMemoryUsedMb() int64 {
+	if x != nil {
+		return x.MemoryUsedMb
 	}
 	return 0
 }
@@ -2085,11 +2117,14 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\x05total\x18\x03 \x01(\x05R\x05total\x12\x15\n" +
 	"\x06in_use\x18\x04 \x01(\x05R\x05inUse\"B\n" +
 	"\tHeartbeat\x125\n" +
-	"\x05usage\x18\x01 \x01(\v2\x1f.tossbox.agent.v1.ResourceUsageR\x05usage\"\x81\x01\n" +
+	"\x05usage\x18\x01 \x01(\v2\x1f.tossbox.agent.v1.ResourceUsageR\x05usage\"\x8e\x02\n" +
 	"\rResourceUsage\x12\x1e\n" +
 	"\vram_used_mb\x18\x01 \x01(\x03R\tramUsedMb\x12(\n" +
 	"\x10cpu_used_percent\x18\x02 \x01(\x01R\x0ecpuUsedPercent\x12&\n" +
-	"\x0fstorage_used_gb\x18\x03 \x01(\x03R\rstorageUsedGb\"\xfc\x01\n" +
+	"\x0fstorage_used_gb\x18\x03 \x01(\x03R\rstorageUsedGb\x12'\n" +
+	"\x10host_ram_used_mb\x18\x04 \x01(\x03R\rhostRamUsedMb\x12/\n" +
+	"\x14host_storage_used_gb\x18\x05 \x01(\x03R\x11hostStorageUsedGb\x121\n" +
+	"\x15host_storage_total_gb\x18\x06 \x01(\x03R\x12hostStorageTotalGb\"\xa2\x02\n" +
 	"\fDeviceStatus\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x123\n" +
 	"\x05state\x18\x02 \x01(\x0e2\x1d.tossbox.agent.v1.DeviceStateR\x05state\x12\x14\n" +
@@ -2098,7 +2133,8 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\vinternal_ip\x18\x05 \x01(\tR\n" +
 	"internalIp\x12&\n" +
 	"\x0fstorage_used_mb\x18\x06 \x01(\x03R\rstorageUsedMb\x12!\n" +
-	"\fupdated_unix\x18\a \x01(\x03R\vupdatedUnix\"w\n" +
+	"\fupdated_unix\x18\a \x01(\x03R\vupdatedUnix\x12$\n" +
+	"\x0ememory_used_mb\x18\b \x01(\x03R\fmemoryUsedMb\"w\n" +
 	"\aWelcome\x12\x17\n" +
 	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
 	"\tnode_name\x18\x02 \x01(\tR\bnodeName\x126\n" +
