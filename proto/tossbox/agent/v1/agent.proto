@@ -1,0 +1,241 @@
+// Tossbox dashboard <-> node agent protocol.
+//
+// Model: the dashboard owns the DESIRED state of every device; the agent owns
+// the ACTUAL state. The agent keeps one long-lived bidirectional stream open
+// (NodeControl.Connect, outbound from the node). On (re)connect the dashboard
+// sends the full desired state of that node (Welcome); afterwards it sends
+// incremental ApplyDevice / DeleteDevice messages. The agent reconciles and
+// reports DeviceStatus whenever the actual state changes.
+//
+// Security: Enrollment.Enroll is called over TLS with the dashboard CA pinned
+// (fingerprint contained in the enrollment token) and authenticated by the
+// one-time token. NodeControl.Connect requires mTLS with the issued client cert.
+syntax = "proto3";
+
+package tossbox.agent.v1;
+
+option go_package = "github.com/finn-freitag/tb-proto/gen/agent/v1;agentv1";
+
+// ---------------------------------------------------------------- enrollment
+
+service Enrollment {
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+}
+
+message EnrollRequest {
+  // Secret part of the enrollment token.
+  string token = 1;
+  // PKCS#10 certificate signing request (DER) for the agent's client key.
+  bytes csr_der = 2;
+  string agent_version = 3;
+}
+
+message EnrollResponse {
+  string node_id = 1;
+  string node_name = 2;
+  // Client certificate (DER) signed by the dashboard CA.
+  bytes client_cert_der = 3;
+  // Dashboard CA certificate (DER), to be trusted for all further connections.
+  bytes ca_cert_der = 4;
+}
+
+// ---------------------------------------------------------------- control
+
+service NodeControl {
+  rpc Connect(stream AgentMessage) returns (stream DashboardMessage);
+}
+
+message AgentMessage {
+  oneof msg {
+    Hello hello = 1;           // must be the first message on a stream
+    Heartbeat heartbeat = 2;
+    DeviceStatus device_status = 3;
+    CapabilitiesChanged capabilities_changed = 4;
+    Pong pong = 5;
+  }
+}
+
+message DashboardMessage {
+  oneof msg {
+    Welcome welcome = 1;       // first message from the dashboard
+    ApplyDevice apply_device = 2;
+    DeleteDevice delete_device = 3;
+    Ping ping = 4;
+  }
+}
+
+message Ping { int64 nonce = 1; }
+message Pong { int64 nonce = 1; }
+
+// ---------------------------------------------------------------- agent -> dashboard
+
+message Hello {
+  string agent_version = 1;
+  Capabilities capabilities = 2;
+  // Actual state of every device this agent currently manages.
+  repeated DeviceStatus devices = 3;
+}
+
+message CapabilitiesChanged { Capabilities capabilities = 1; }
+
+message Capabilities {
+  string arch = 1;              // "x86_64", "arm64"
+  string os = 2;                // "linux", "darwin"
+  int32 host_cores = 3;
+  int64 host_ram_mb = 4;
+  int64 host_storage_gb = 5;
+  NodeLimits limits = 6;        // from the node config
+  repeated DriverCapabilities drivers = 7;
+  repeated LicensePoolInfo license_pools = 8;
+}
+
+message NodeLimits {
+  int64 ram_mb = 1;             // 0 = unlimited (host total)
+  int32 cpu_percent = 2;        // share of host CPU, 0 = 100
+  int64 storage_gb = 3;         // 0 = unlimited
+}
+
+message DriverCapabilities {
+  string name = 1;              // "libvirt", "docker-qemu", "lxc", "android", "orchard", "usb-phone"
+  repeated string families = 2; // "linux", "windows", "android", "macos", "ios"
+  repeated string services = 3; // "ssh", "rdp", "vnc", "adb", "http", "https"
+  repeated string backends = 4; // driver sub-backends, e.g. "cuttlefish", "redroid"
+  // For count-based drivers (orchard, usb-phone): total slots; 0 = resource-based.
+  int32 fixed_slots = 5;
+  bool healthy = 6;
+  string message = 7;           // health / error detail
+  // usb-phone: currently attached physical devices.
+  repeated PhysicalDevice physical_devices = 8;
+}
+
+message PhysicalDevice {
+  string serial = 1;
+  string family = 2;            // "android", "ios"
+  string model = 3;
+  bool available = 4;
+}
+
+message LicensePoolInfo {
+  string name = 1;
+  string type = 2;              // "retail", "mak", "kms"
+  int32 total = 3;              // number of keys; the keys never leave the node
+  int32 in_use = 4;
+}
+
+message Heartbeat {
+  ResourceUsage usage = 1;
+}
+
+message ResourceUsage {
+  int64 ram_used_mb = 1;        // by devices
+  double cpu_used_percent = 2;  // of host
+  int64 storage_used_gb = 3;    // actual disk usage of devices
+}
+
+enum DeviceState {
+  DEVICE_STATE_UNSPECIFIED = 0;
+  DEVICE_STATE_PENDING = 1;       // accepted, not started
+  DEVICE_STATE_PROVISIONING = 2;  // downloading image, creating disk, first boot
+  DEVICE_STATE_RUNNING = 3;
+  DEVICE_STATE_STOPPING = 4;
+  DEVICE_STATE_STOPPED = 5;
+  DEVICE_STATE_DESTROYING = 6;
+  DEVICE_STATE_DESTROYED = 7;     // terminal; dashboard may forget the device
+  DEVICE_STATE_FAILED = 8;
+}
+
+message DeviceStatus {
+  string device_id = 1;
+  DeviceState state = 2;
+  bool ready = 3;               // readiness check passed (e.g. SSH answers)
+  string message = 4;           // human readable progress / error
+  string internal_ip = 5;
+  int64 storage_used_mb = 6;
+  int64 updated_unix = 7;
+}
+
+// ---------------------------------------------------------------- dashboard -> agent
+
+message Welcome {
+  string node_id = 1;
+  string node_name = 2;
+  // Complete desired state for this node. Devices managed by the agent but not
+  // listed here must be destroyed.
+  repeated DeviceSpec devices = 3;
+}
+
+message ApplyDevice { DeviceSpec device = 1; }
+
+message DeleteDevice { string device_id = 1; }
+
+enum PowerState {
+  POWER_STATE_UNSPECIFIED = 0;
+  POWER_STATE_RUNNING = 1;
+  POWER_STATE_STOPPED = 2;
+}
+
+message DeviceSpec {
+  string device_id = 1;
+  string hostname = 2;          // DNS-safe slug, also used as guest hostname
+  string driver = 3;
+  TemplateSpec template = 4;
+  Resources resources = 5;
+  repeated ServiceSpec services = 6;
+  repeated string ssh_authorized_keys = 7;
+  LicenseSpec license = 8;
+  PowerState power = 9;
+  // Driver specific options (e.g. android backend, physical device serial).
+  map<string, string> params = 10;
+  // Monotonic revision; the agent ignores specs older than what it has applied.
+  int64 revision = 11;
+}
+
+message Resources {
+  int32 vcpus = 1;
+  int32 cpu_cap_percent = 2;    // share of node CPU, enforced via cgroups; 0 = no cap
+  int64 ram_mb = 3;
+  int64 storage_gb = 4;
+}
+
+message ServiceSpec {
+  string name = 1;              // "ssh", "rdp", "vnc", "adb", "http", "https"
+  int32 internal_port = 2;      // port inside the device
+  int32 public_port = 3;        // port the agent listens on (same as on the gateway)
+  string username = 4;
+  string password = 5;
+}
+
+enum LicenseMode {
+  LICENSE_MODE_UNSPECIFIED = 0;
+  LICENSE_MODE_NONE = 1;
+  LICENSE_MODE_USER_KEY = 2;
+  LICENSE_MODE_POOL = 3;
+}
+
+message LicenseSpec {
+  LicenseMode mode = 1;
+  string user_key = 2;          // only for LICENSE_MODE_USER_KEY
+  string pool = 3;              // only for LICENSE_MODE_POOL; agent picks a free key
+}
+
+message TemplateSpec {
+  string id = 1;
+  string version = 2;
+  string family = 3;            // "linux", "windows", "android", "macos", "ios"
+  string guest_profile = 4;     // "cloud-init", "windows-unattend", "android", "tart", "phone"
+  string readiness = 5;         // "ssh", "rdp", "adb", "none"
+  string default_user = 6;
+  ImageSpec image = 7;          // image for the selected driver
+  map<string, string> params = 8;
+}
+
+message ImageSpec {
+  // Source of the base image. Schemes:
+  //   https://...           download and cache
+  //   local:<file>          file in the agent's image directory (e.g. licensed Windows images)
+  //   docker://<ref>        container image (docker-qemu, android/redroid)
+  //   oci://<ref>           OCI image (orchard/tart)
+  string url = 1;
+  string format = 2;            // "qcow2", "raw", "img", "iso", "container"
+  string sha256 = 3;            // optional checksum for downloads
+}
