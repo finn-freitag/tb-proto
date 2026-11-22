@@ -192,6 +192,9 @@ message DeviceSpec {
   map<string, string> params = 10;
   // Monotonic revision; the agent ignores specs older than what it has applied.
   int64 revision = 11;
+  // adb public keys (content of ~/.android/adbkey.pub) allowed to connect to
+  // Android devices that require adb authentication.
+  repeated string adb_authorized_keys = 12;
 }
 
 message Resources {

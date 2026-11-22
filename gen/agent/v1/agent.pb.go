@@ -1561,9 +1561,12 @@ type DeviceSpec struct {
 	// Driver specific options (e.g. android backend, physical device serial).
 	Params map[string]string `protobuf:"bytes,10,rep,name=params,proto3" json:"params,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Monotonic revision; the agent ignores specs older than what it has applied.
-	Revision      int64 `protobuf:"varint,11,opt,name=revision,proto3" json:"revision,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Revision int64 `protobuf:"varint,11,opt,name=revision,proto3" json:"revision,omitempty"`
+	// adb public keys (content of ~/.android/adbkey.pub) allowed to connect to
+	// Android devices that require adb authentication.
+	AdbAuthorizedKeys []string `protobuf:"bytes,12,rep,name=adb_authorized_keys,json=adbAuthorizedKeys,proto3" json:"adb_authorized_keys,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *DeviceSpec) Reset() {
@@ -1671,6 +1674,13 @@ func (x *DeviceSpec) GetRevision() int64 {
 		return x.Revision
 	}
 	return 0
+}
+
+func (x *DeviceSpec) GetAdbAuthorizedKeys() []string {
+	if x != nil {
+		return x.AdbAuthorizedKeys
+	}
+	return nil
 }
 
 type Resources struct {
@@ -2142,7 +2152,7 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\vApplyDevice\x124\n" +
 	"\x06device\x18\x01 \x01(\v2\x1c.tossbox.agent.v1.DeviceSpecR\x06device\"+\n" +
 	"\fDeleteDevice\x12\x1b\n" +
-	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\"\xc5\x04\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\"\xf5\x04\n" +
 	"\n" +
 	"DeviceSpec\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1a\n" +
@@ -2156,7 +2166,8 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\x05power\x18\t \x01(\x0e2\x1c.tossbox.agent.v1.PowerStateR\x05power\x12@\n" +
 	"\x06params\x18\n" +
 	" \x03(\v2(.tossbox.agent.v1.DeviceSpec.ParamsEntryR\x06params\x12\x1a\n" +
-	"\brevision\x18\v \x01(\x03R\brevision\x1a9\n" +
+	"\brevision\x18\v \x01(\x03R\brevision\x12.\n" +
+	"\x13adb_authorized_keys\x18\f \x03(\tR\x11adbAuthorizedKeys\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x7f\n" +
