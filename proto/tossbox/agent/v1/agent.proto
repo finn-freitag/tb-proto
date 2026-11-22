@@ -106,6 +106,13 @@ message DriverCapabilities {
   string message = 7;           // health / error detail
   // usb-phone: currently attached physical devices.
   repeated PhysicalDevice physical_devices = 8;
+  // Network policies the driver can enforce ("internet", "offline").
+  repeated string network_policies = 9;
+  // How devices get a GPU: "" (none), "virgl" (shared paravirtual 3D),
+  // "sriov" (a virtual function each), "render" (shared host render node).
+  string gpu_mode = 10;
+  // Devices that can have a GPU at the same time; -1 = unlimited (shared).
+  int32 gpu_slots = 11;
 }
 
 message PhysicalDevice {
@@ -195,6 +202,10 @@ message DeviceSpec {
   // adb public keys (content of ~/.android/adbkey.pub) allowed to connect to
   // Android devices that require adb authentication.
   repeated string adb_authorized_keys = 12;
+  // Outbound network access: "internet" (default when empty; the node's
+  // firewall blocks private networks) or "offline" (no outbound traffic at
+  // all; the device is still reachable through its forwarded ports).
+  string network_policy = 13;
 }
 
 message Resources {
@@ -202,6 +213,7 @@ message Resources {
   int32 cpu_cap_percent = 2;    // share of node CPU, enforced via cgroups; 0 = no cap
   int64 ram_mb = 3;
   int64 storage_gb = 4;
+  int32 gpus = 5;               // 0 or 1: the device gets a GPU (see DriverCapabilities.gpu_mode)
 }
 
 message ServiceSpec {

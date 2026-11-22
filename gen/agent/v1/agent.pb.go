@@ -943,8 +943,15 @@ type DriverCapabilities struct {
 	Message    string `protobuf:"bytes,7,opt,name=message,proto3" json:"message,omitempty"` // health / error detail
 	// usb-phone: currently attached physical devices.
 	PhysicalDevices []*PhysicalDevice `protobuf:"bytes,8,rep,name=physical_devices,json=physicalDevices,proto3" json:"physical_devices,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Network policies the driver can enforce ("internet", "offline").
+	NetworkPolicies []string `protobuf:"bytes,9,rep,name=network_policies,json=networkPolicies,proto3" json:"network_policies,omitempty"`
+	// How devices get a GPU: "" (none), "virgl" (shared paravirtual 3D),
+	// "sriov" (a virtual function each), "render" (shared host render node).
+	GpuMode string `protobuf:"bytes,10,opt,name=gpu_mode,json=gpuMode,proto3" json:"gpu_mode,omitempty"`
+	// Devices that can have a GPU at the same time; -1 = unlimited (shared).
+	GpuSlots      int32 `protobuf:"varint,11,opt,name=gpu_slots,json=gpuSlots,proto3" json:"gpu_slots,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DriverCapabilities) Reset() {
@@ -1031,6 +1038,27 @@ func (x *DriverCapabilities) GetPhysicalDevices() []*PhysicalDevice {
 		return x.PhysicalDevices
 	}
 	return nil
+}
+
+func (x *DriverCapabilities) GetNetworkPolicies() []string {
+	if x != nil {
+		return x.NetworkPolicies
+	}
+	return nil
+}
+
+func (x *DriverCapabilities) GetGpuMode() string {
+	if x != nil {
+		return x.GpuMode
+	}
+	return ""
+}
+
+func (x *DriverCapabilities) GetGpuSlots() int32 {
+	if x != nil {
+		return x.GpuSlots
+	}
+	return 0
 }
 
 type PhysicalDevice struct {
@@ -1565,8 +1593,12 @@ type DeviceSpec struct {
 	// adb public keys (content of ~/.android/adbkey.pub) allowed to connect to
 	// Android devices that require adb authentication.
 	AdbAuthorizedKeys []string `protobuf:"bytes,12,rep,name=adb_authorized_keys,json=adbAuthorizedKeys,proto3" json:"adb_authorized_keys,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Outbound network access: "internet" (default when empty; the node's
+	// firewall blocks private networks) or "offline" (no outbound traffic at
+	// all; the device is still reachable through its forwarded ports).
+	NetworkPolicy string `protobuf:"bytes,13,opt,name=network_policy,json=networkPolicy,proto3" json:"network_policy,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *DeviceSpec) Reset() {
@@ -1683,12 +1715,20 @@ func (x *DeviceSpec) GetAdbAuthorizedKeys() []string {
 	return nil
 }
 
+func (x *DeviceSpec) GetNetworkPolicy() string {
+	if x != nil {
+		return x.NetworkPolicy
+	}
+	return ""
+}
+
 type Resources struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Vcpus         int32                  `protobuf:"varint,1,opt,name=vcpus,proto3" json:"vcpus,omitempty"`
 	CpuCapPercent int32                  `protobuf:"varint,2,opt,name=cpu_cap_percent,json=cpuCapPercent,proto3" json:"cpu_cap_percent,omitempty"` // share of node CPU, enforced via cgroups; 0 = no cap
 	RamMb         int64                  `protobuf:"varint,3,opt,name=ram_mb,json=ramMb,proto3" json:"ram_mb,omitempty"`
 	StorageGb     int64                  `protobuf:"varint,4,opt,name=storage_gb,json=storageGb,proto3" json:"storage_gb,omitempty"`
+	Gpus          int32                  `protobuf:"varint,5,opt,name=gpus,proto3" json:"gpus,omitempty"` // 0 or 1: the device gets a GPU (see DriverCapabilities.gpu_mode)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1747,6 +1787,13 @@ func (x *Resources) GetRamMb() int64 {
 func (x *Resources) GetStorageGb() int64 {
 	if x != nil {
 		return x.StorageGb
+	}
+	return 0
+}
+
+func (x *Resources) GetGpus() int32 {
+	if x != nil {
+		return x.Gpus
 	}
 	return 0
 }
@@ -2105,7 +2152,7 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\vcpu_percent\x18\x02 \x01(\x05R\n" +
 	"cpuPercent\x12\x1d\n" +
 	"\n" +
-	"storage_gb\x18\x03 \x01(\x03R\tstorageGb\"\x9e\x02\n" +
+	"storage_gb\x18\x03 \x01(\x03R\tstorageGb\"\x81\x03\n" +
 	"\x12DriverCapabilities\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bfamilies\x18\x02 \x03(\tR\bfamilies\x12\x1a\n" +
@@ -2115,7 +2162,11 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"fixedSlots\x12\x18\n" +
 	"\ahealthy\x18\x06 \x01(\bR\ahealthy\x12\x18\n" +
 	"\amessage\x18\a \x01(\tR\amessage\x12K\n" +
-	"\x10physical_devices\x18\b \x03(\v2 .tossbox.agent.v1.PhysicalDeviceR\x0fphysicalDevices\"t\n" +
+	"\x10physical_devices\x18\b \x03(\v2 .tossbox.agent.v1.PhysicalDeviceR\x0fphysicalDevices\x12)\n" +
+	"\x10network_policies\x18\t \x03(\tR\x0fnetworkPolicies\x12\x19\n" +
+	"\bgpu_mode\x18\n" +
+	" \x01(\tR\agpuMode\x12\x1b\n" +
+	"\tgpu_slots\x18\v \x01(\x05R\bgpuSlots\"t\n" +
 	"\x0ePhysicalDevice\x12\x16\n" +
 	"\x06serial\x18\x01 \x01(\tR\x06serial\x12\x16\n" +
 	"\x06family\x18\x02 \x01(\tR\x06family\x12\x14\n" +
@@ -2152,7 +2203,7 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\vApplyDevice\x124\n" +
 	"\x06device\x18\x01 \x01(\v2\x1c.tossbox.agent.v1.DeviceSpecR\x06device\"+\n" +
 	"\fDeleteDevice\x12\x1b\n" +
-	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\"\xf5\x04\n" +
+	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\"\x9c\x05\n" +
 	"\n" +
 	"DeviceSpec\x12\x1b\n" +
 	"\tdevice_id\x18\x01 \x01(\tR\bdeviceId\x12\x1a\n" +
@@ -2167,16 +2218,18 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\x06params\x18\n" +
 	" \x03(\v2(.tossbox.agent.v1.DeviceSpec.ParamsEntryR\x06params\x12\x1a\n" +
 	"\brevision\x18\v \x01(\x03R\brevision\x12.\n" +
-	"\x13adb_authorized_keys\x18\f \x03(\tR\x11adbAuthorizedKeys\x1a9\n" +
+	"\x13adb_authorized_keys\x18\f \x03(\tR\x11adbAuthorizedKeys\x12%\n" +
+	"\x0enetwork_policy\x18\r \x01(\tR\rnetworkPolicy\x1a9\n" +
 	"\vParamsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x7f\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\x93\x01\n" +
 	"\tResources\x12\x14\n" +
 	"\x05vcpus\x18\x01 \x01(\x05R\x05vcpus\x12&\n" +
 	"\x0fcpu_cap_percent\x18\x02 \x01(\x05R\rcpuCapPercent\x12\x15\n" +
 	"\x06ram_mb\x18\x03 \x01(\x03R\x05ramMb\x12\x1d\n" +
 	"\n" +
-	"storage_gb\x18\x04 \x01(\x03R\tstorageGb\"\x9f\x01\n" +
+	"storage_gb\x18\x04 \x01(\x03R\tstorageGb\x12\x12\n" +
+	"\x04gpus\x18\x05 \x01(\x05R\x04gpus\"\x9f\x01\n" +
 	"\vServiceSpec\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12#\n" +
 	"\rinternal_port\x18\x02 \x01(\x05R\finternalPort\x12\x1f\n" +
