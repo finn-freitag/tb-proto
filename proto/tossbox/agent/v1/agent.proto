@@ -87,6 +87,10 @@ message Capabilities {
   NodeLimits limits = 6;        // from the node config
   repeated DriverCapabilities drivers = 7;
   repeated LicensePoolInfo license_pools = 8;
+  // Image files available for local:<name> template images (e.g. Packer
+  // golden images). The dashboard only schedules such templates on nodes
+  // that have the image.
+  repeated string local_images = 9;
 }
 
 message NodeLimits {
@@ -113,6 +117,8 @@ message DriverCapabilities {
   string gpu_mode = 10;
   // Devices that can have a GPU at the same time; -1 = unlimited (shared).
   int32 gpu_slots = 11;
+  // Families that can use the GPU (empty = all families of the driver).
+  repeated string gpu_families = 12;
 }
 
 message PhysicalDevice {

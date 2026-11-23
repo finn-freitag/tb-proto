@@ -781,6 +781,10 @@ type Capabilities struct {
 	Limits        *NodeLimits            `protobuf:"bytes,6,opt,name=limits,proto3" json:"limits,omitempty"` // from the node config
 	Drivers       []*DriverCapabilities  `protobuf:"bytes,7,rep,name=drivers,proto3" json:"drivers,omitempty"`
 	LicensePools  []*LicensePoolInfo     `protobuf:"bytes,8,rep,name=license_pools,json=licensePools,proto3" json:"license_pools,omitempty"`
+	// Image files available for local:<name> template images (e.g. Packer
+	// golden images). The dashboard only schedules such templates on nodes
+	// that have the image.
+	LocalImages   []string `protobuf:"bytes,9,rep,name=local_images,json=localImages,proto3" json:"local_images,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -871,6 +875,13 @@ func (x *Capabilities) GetLicensePools() []*LicensePoolInfo {
 	return nil
 }
 
+func (x *Capabilities) GetLocalImages() []string {
+	if x != nil {
+		return x.LocalImages
+	}
+	return nil
+}
+
 type NodeLimits struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RamMb         int64                  `protobuf:"varint,1,opt,name=ram_mb,json=ramMb,proto3" json:"ram_mb,omitempty"`                // 0 = unlimited (host total)
@@ -949,7 +960,9 @@ type DriverCapabilities struct {
 	// "sriov" (a virtual function each), "render" (shared host render node).
 	GpuMode string `protobuf:"bytes,10,opt,name=gpu_mode,json=gpuMode,proto3" json:"gpu_mode,omitempty"`
 	// Devices that can have a GPU at the same time; -1 = unlimited (shared).
-	GpuSlots      int32 `protobuf:"varint,11,opt,name=gpu_slots,json=gpuSlots,proto3" json:"gpu_slots,omitempty"`
+	GpuSlots int32 `protobuf:"varint,11,opt,name=gpu_slots,json=gpuSlots,proto3" json:"gpu_slots,omitempty"`
+	// Families that can use the GPU (empty = all families of the driver).
+	GpuFamilies   []string `protobuf:"bytes,12,rep,name=gpu_families,json=gpuFamilies,proto3" json:"gpu_families,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1059,6 +1072,13 @@ func (x *DriverCapabilities) GetGpuSlots() int32 {
 		return x.GpuSlots
 	}
 	return 0
+}
+
+func (x *DriverCapabilities) GetGpuFamilies() []string {
+	if x != nil {
+		return x.GpuFamilies
+	}
+	return nil
 }
 
 type PhysicalDevice struct {
@@ -2135,7 +2155,7 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\fcapabilities\x18\x02 \x01(\v2\x1e.tossbox.agent.v1.CapabilitiesR\fcapabilities\x128\n" +
 	"\adevices\x18\x03 \x03(\v2\x1e.tossbox.agent.v1.DeviceStatusR\adevices\"Y\n" +
 	"\x13CapabilitiesChanged\x12B\n" +
-	"\fcapabilities\x18\x01 \x01(\v2\x1e.tossbox.agent.v1.CapabilitiesR\fcapabilities\"\xd7\x02\n" +
+	"\fcapabilities\x18\x01 \x01(\v2\x1e.tossbox.agent.v1.CapabilitiesR\fcapabilities\"\xfa\x02\n" +
 	"\fCapabilities\x12\x12\n" +
 	"\x04arch\x18\x01 \x01(\tR\x04arch\x12\x0e\n" +
 	"\x02os\x18\x02 \x01(\tR\x02os\x12\x1d\n" +
@@ -2145,14 +2165,15 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\x0fhost_storage_gb\x18\x05 \x01(\x03R\rhostStorageGb\x124\n" +
 	"\x06limits\x18\x06 \x01(\v2\x1c.tossbox.agent.v1.NodeLimitsR\x06limits\x12>\n" +
 	"\adrivers\x18\a \x03(\v2$.tossbox.agent.v1.DriverCapabilitiesR\adrivers\x12F\n" +
-	"\rlicense_pools\x18\b \x03(\v2!.tossbox.agent.v1.LicensePoolInfoR\flicensePools\"c\n" +
+	"\rlicense_pools\x18\b \x03(\v2!.tossbox.agent.v1.LicensePoolInfoR\flicensePools\x12!\n" +
+	"\flocal_images\x18\t \x03(\tR\vlocalImages\"c\n" +
 	"\n" +
 	"NodeLimits\x12\x15\n" +
 	"\x06ram_mb\x18\x01 \x01(\x03R\x05ramMb\x12\x1f\n" +
 	"\vcpu_percent\x18\x02 \x01(\x05R\n" +
 	"cpuPercent\x12\x1d\n" +
 	"\n" +
-	"storage_gb\x18\x03 \x01(\x03R\tstorageGb\"\x81\x03\n" +
+	"storage_gb\x18\x03 \x01(\x03R\tstorageGb\"\xa4\x03\n" +
 	"\x12DriverCapabilities\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bfamilies\x18\x02 \x03(\tR\bfamilies\x12\x1a\n" +
@@ -2166,7 +2187,8 @@ const file_tossbox_agent_v1_agent_proto_rawDesc = "" +
 	"\x10network_policies\x18\t \x03(\tR\x0fnetworkPolicies\x12\x19\n" +
 	"\bgpu_mode\x18\n" +
 	" \x01(\tR\agpuMode\x12\x1b\n" +
-	"\tgpu_slots\x18\v \x01(\x05R\bgpuSlots\"t\n" +
+	"\tgpu_slots\x18\v \x01(\x05R\bgpuSlots\x12!\n" +
+	"\fgpu_families\x18\f \x03(\tR\vgpuFamilies\"t\n" +
 	"\x0ePhysicalDevice\x12\x16\n" +
 	"\x06serial\x18\x01 \x01(\tR\x06serial\x12\x16\n" +
 	"\x06family\x18\x02 \x01(\tR\x06family\x12\x14\n" +
