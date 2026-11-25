@@ -169,6 +169,9 @@ message DeviceStatus {
   int64 storage_used_mb = 6;
   int64 updated_unix = 7;
   int64 memory_used_mb = 8;     // measured guest/container memory, 0 = unknown
+  // Measured CPU usage of the device as a share of the whole node (0-100),
+  // averaged since the previous status; 0 = idle or unknown.
+  double cpu_used_percent = 9;
 }
 
 // ---------------------------------------------------------------- dashboard -> agent
